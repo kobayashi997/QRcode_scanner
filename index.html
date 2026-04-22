@@ -204,27 +204,21 @@ function triggerSuccess(data) {
 
 // 3. GASへの送信
 function sendToGas(qrData) {
-  const gasUrl = "https://script.google.com/macros/s/AKfycbxIE3BLCtPha7hZs0guxxcheHA16_lBvCYxY8-iqN0iaruRptJHpCiZsQS-N2LW7UJz/exec";
+  const gasUrl = "https://google.com";
 
-  // 1. まず非同期でGASにデータを送り、記録を付ける（doPostを実行）
   fetch(gasUrl, {
     method: "POST",
     mode: "no-cors", 
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ qrData: qrData })
+    body: JSON.stringify({ 
+      qrData: qrData,
+      token: "library_gate_2024_secure" // ここで合言葉を送る
+    })
   }).then(() => {
-    // 2. 記録が終わったら、その足で図書システム画面(doGet)へ直接ジャンプ！
-    status.innerText = "認証完了。システムへ移動します...";
-    setTimeout(() => {
-      // sidをパラメータに付けて遷移することで、GAS側で誰が来たか判別できる
-      window.location.href = gasUrl + "?mode=top&sid=" + encodeURIComponent(qrData);
-    }, 800); 
-  }).catch(err => {
-    status.innerText = "送信エラー";
-    isScanning = true;
-    requestAnimationFrame(scan);
+    // 成功時のみ遷移
+    window.location.href = gasUrl + "?mode=top&sid=" + encodeURIComponent(qrData);
   });
 }
+
 
 </script>
 </body>
