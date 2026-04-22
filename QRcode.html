@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Scanner Pro</title>
+
+<style>
+  :root {
+    --primary: #22d3ee;
+    --success: #4ade80;
+    --error: #f87171;
+    --bg: #0f172a;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .container {
+    width: 90%;
+    max-width: 400px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  h2 {
+    font-weight: 300;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    color: var(--primary);
+  }
+
+  /* カメラコンテナ */
+  .scanner-view {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.1);
+    background: #000;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* スキャンアニメーション */
+  .laser {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--primary);
+    box-shadow: 0 0 15px var(--primary);
+    animation: scanning 2s infinite;
+    z-index: 10;
+  }
+
+  @keyframes scanning {
+    0% { top: 0%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* コーナーガイド */
+  .corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--primary);
+    z-index: 11;
+  }
+  .tl { top: 20px; left: 20px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+  .tr { top: 20px; right: 20px; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+  .bl { bottom: 20px; left: 20px; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+  .br { bottom: 20px; right: 20px; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+  /* ステータス表示 */
+  .status {
+    margin-top: 24px;
+    padding: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+  }
+
+  .status.ok { 
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(74, 222, 128, 0.1);
+  }
+
+  .status.err { 
+    border-color: var(--error);
+    color: var(--error);
+    background: rgba(248, 113, 113, 0.1);
+  }
+
+  /* 読み取り成功時のフラッシュ */
+  .flash {
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .flash.active { animation: flash-effect 0.4s; }
+  @keyframes flash-effect {
+    0% { opacity: 0.5; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>QR SCANNER</h2>
+
+  <div class="scanner-view">
+    <video id="video" autoplay playsinline></video>
+    <div class="laser"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div id="flash" class="flash"></div>
+  </div>
+
+  <div id="status" class="status">Initializing Camera...</div>
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const status = document.getElementById("status");
+const flash = document.getElementById("flash");
+let isScanning = true;
+
+// 1. カメラの開始
+navigator.mediaDevices.getUserMedia({ 
+  video: { facingMode: "environment" } 
+}).then(stream => {
+  video.srcObject = stream;
+  status.innerText = "READY TO SCAN";
+  requestAnimationFrame(scan);
+}).catch(err => {
+  status.innerText = "CAMERA ACCESS DENIED";
+  status.classList.add("err");
+});
+
+// 2. スキャン処理
+function scan() {
+  if (!isScanning) return;
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+    if (code) {
+      isScanning = false;
+      triggerSuccess(code.data);
+      return;
+    }
+  }
+  requestAnimationFrame(scan);
+}
+
+function triggerSuccess(data) {
+  // 視覚効果
+  flash.classList.add("active");
+  status.innerText = "QR DETECTED: SENDING...";
+  status.classList.add("ok");
+
+  setTimeout(() => flash.classList.remove("active"), 400);
+
+  sendToGas(data);
+}
+
+// 3. GASへの送信
+function sendToGas(qrData) {
+  const gasUrl = "YOUR_GAS_URL_HERE";
+
+  fetch(gasUrl, {
+    method: "POST",
+    mode: "no-cors", 
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ qrData: qrData })
+  }).then(() => {
+    status.innerText = "SUCCESSFULLY RECORDED";
+    setTimeout(() => {
+      isScanning = true;
+      status.innerText = "READY TO SCAN";
+      status.classList.remove("ok");
+      requestAnimationFrame(scan);
+    }, 1500);
+  }).catch(err => {
+    status.innerText = "CONNECTION ERROR";
+    status.classList.add("err");
+    isScanning = true;
+    requestAnimationFrame(scan);
+  });
+}
+</script>
+</body>
+</html>
