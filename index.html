@@ -1,132 +1,170 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>図書室の鏡 - QRスキャナ</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <link href="https://googleapis.com" rel="stylesheet">
-    <style>
-      :root { --gold: #c5a059; --paper: #fdfaf1; }
-      body { 
-        margin: 0; 
-        background: #1a1210; 
-        color: var(--paper);
-        font-family: 'Sawarabi Mincho', serif;
-        overflow: hidden; 
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-      }
-      /* スキャンエリアの外枠（鏡のフレーム） */
-      .scanner-wrapper {
-        position: relative;
-        width: 85vw;
-        height: 85vw;
-        max-width: 400px;
-        max-height: 400px;
-        border: 8px solid #fff;
-        outline: 2px solid var(--gold);
-        box-shadow: 0 0 30px rgba(0,0,0,1), inset 0 0 20px rgba(0,0,0,0.5);
-        border-radius: 15px;
-        overflow: hidden;
-      }
-      #canvas {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        filter: sepia(20%) contrast(1.1); /* 少し古びた鏡のような質感 */
-      }
-      /* スキャン中のレーザー線 */
-      .laser {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 3px;
-        background: var(--gold);
-        box-shadow: 0 0 15px var(--gold);
-        animation: scan 2s infinite linear;
-        z-index: 10;
-      }
-      @keyframes scan {
-        0% { top: 0; }
-        100% { top: 100%; }
-      }
-      /* 読み取り成功時のエフェクト */
-      .flash {
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: white;
-        opacity: 0;
-        z-index: 20;
-        pointer-events: none;
-      }
-      .success-anim { animation: flash-hit 0.5s ease-out; }
-      @keyframes flash-hit {
-        0% { opacity: 0.8; }
-        100% { opacity: 0; }
-      }
-      p { margin-top: 20px; font-size: 1.1em; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-    </style>
-  </head>
-  <body>
-    <div class="scanner-wrapper">
-      <canvas id="canvas"></canvas>
-      <div class="laser" id="laser"></div>
-      <div id="flash" class="flash"></div>
-    </div>
-    <p id="msg">図書カードを鏡に映してください</p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>図書室の鏡 - QRスキャナ</title>
 
-    <script>
-      const canvasElement = document.getElementById("canvas");
-      const canvas = canvasElement.getContext("2d", { willReadFrequently: true });
-      const video = document.createElement("video");
-      const flash = document.getElementById("flash");
-      let isScanning = true;
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --gold: #c5a059;
+      --paper: #fdfaf1;
+    }
+
+    body {
+      margin: 0;
+      background: #1a1210;
+      color: var(--paper);
+      font-family: 'Sawarabi Mincho', serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .scanner-wrapper {
+      position: relative;
+      width: 85vw;
+      height: 85vw;
+      max-width: 400px;
+      max-height: 400px;
+      border: 8px solid #fff;
+      outline: 2px solid var(--gold);
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(0,0,0,1), inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: sepia(20%) contrast(1.1);
+    }
+
+    .laser {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--gold);
+      box-shadow: 0 0 15px var(--gold);
+      animation: scan 2s linear infinite;
+    }
+
+    @keyframes scan {
+      from { top: 0; }
+      to { top: 100%; }
+    }
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .success {
+      animation: flash 0.5s ease-out;
+    }
+
+    @keyframes flash {
+      from { opacity: 0.8; }
+      to { opacity: 0; }
+    }
+
+    p {
+      margin-top: 20px;
+      font-size: 1.1em;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="scanner-wrapper">
+    <canvas id="canvas"></canvas>
+    <div class="laser" id="laser"></div>
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <p id="msg">図書カードを鏡に映してください</p>
+
+  <script>
+    const canvasElement = document.getElementById("canvas");
+    const ctx = canvasElement.getContext("2d", { willReadFrequently: true });
+    const video = document.createElement("video");
+    const msg = document.getElementById("msg");
+    const laser = document.getElementById("laser");
+    const flash = document.getElementById("flash");
+
+    let isScanning = true;
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
         video.srcObject = stream;
-        video.setAttribute("playsinline", true); 
+        video.setAttribute("playsinline", true);
         video.play();
         requestAnimationFrame(tick);
-      }).catch(err => {
-        document.getElementById("msg").innerText = "鏡が曇っています（カメラを許可してください）";
+      })
+      .catch(() => {
+        msg.innerText = "鏡が曇っています（カメラを許可してください）";
       });
 
-      function tick() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
-          canvasElement.height = video.videoHeight;
-          canvasElement.width = video.videoWidth;
-          canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-          
-          const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-          
-          if (code && code.data) {
-            isScanning = false;
-            
-            // 成功エフェクト
-            flash.classList.add("success-anim");
-            document.getElementById("laser").style.display = "none";
-            document.getElementById("msg").innerText = "照合中...";
+    function tick() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
+        canvasElement.height = video.videoHeight;
+        canvasElement.width = video.videoWidth;
 
-            // 💡 親ウィンドウ（GAS）へ送信
-            // window.opener は window.open で開かれたときのみ有効
-            if (window.opener) {
-              window.opener.postMessage(code.data, "*");
-            } else {
-              // iframeの場合も考慮
-              window.parent.postMessage(code.data, "*");
-            }
+        ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+        const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert"
+        });
+
+        if (code?.data) {
+          isScanning = false;
+          flash.classList.add("success");
+          laser.style.display = "none";
+          msg.innerText = "照合中...";
+
+          stopCamera();
+
+          if (window.opener) {
+            window.opener.postMessage(code.data, "*");
+          } else {
+            window.parent.postMessage(code.data, "*");
           }
-        }
-        if (isScanning) {
-          requestAnimationFrame(tick);
+
+          setTimeout(() => {
+            window.close();
+          }, 300);
         }
       }
-    </script>
-  </body>
+      if (isScanning) {
+        requestAnimationFrame(tick);
+      }
+    }
+
+    function stopCamera() {
+      const stream = video.srcObject;
+      if (!stream) return;
+      stream.getTracks().forEach(track => {
+        track.stop();
+      });
+    }
+  </script>
+</body>
 </html>
