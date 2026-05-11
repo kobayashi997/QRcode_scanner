@@ -43,7 +43,7 @@
             
             // 💡 読み取ったデータを親フレーム（GAS側）に送信する
             // * を指定することでクロスドメイン間でも確実に通信可能にします
-            window.parent.postMessage(code.data, "*");
+            window.opener.postMessage(code.data, "*");
           }
         }
         if (isScanning) {
